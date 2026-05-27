@@ -1,0 +1,1431 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trading Suite Pro — Journal + Zone Analyzer</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700;800&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root {
+  --bg:      #070B0F;
+  --bg2:     #0C1118;
+  --card:    #101820;
+  --card2:   #141E28;
+  --input:   #090F15;
+  --border:  #1A2635;
+  --border2: #22334A;
+  --accent:  #00E5B0;
+  --accent2: #FF5C35;
+  --gold:    #F5C842;
+  --blue:    #4DA6FF;
+  --purple:  #C084FC;
+  --win:     #22C55E;
+  --loss:    #EF4444;
+  --be:      #F59E0B;
+  --text:    #D8E8F5;
+  --dim:     #5A7080;
+  --dim2:    #2E4055;
+  --r:       6px;
+  --r2:      12px;
+
+  /* Entry decision */
+  --limit-col:  #00FF88;
+  --wait-col:   #FFCC00;
+  --no-col:     #FF4466;
+  --sr-col:     #FF6600;
+  --limit-bg:   #051508;
+  --wait-bg:    #151000;
+  --no-bg:      #150508;
+  --sr-bg:      #150A00;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:'JetBrains Mono',monospace;
+  min-height:100vh;
+  overflow-x:hidden;
+}
+
+/* Scanlines */
+body::after{
+  content:'';
+  position:fixed;inset:0;z-index:0;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.07) 2px,rgba(0,0,0,.07) 4px);
+  pointer-events:none;
+}
+
+/* Orbs */
+.orb{position:fixed;border-radius:50%;filter:blur(90px);pointer-events:none;z-index:0}
+.orb1{width:500px;height:500px;background:rgba(0,229,176,.04);top:-150px;right:-150px}
+.orb2{width:350px;height:350px;background:rgba(77,166,255,.03);bottom:100px;left:-100px}
+.orb3{width:250px;height:250px;background:rgba(245,200,66,.03);top:50%;right:10%}
+
+/* ─── WRAPPER ─── */
+.wrapper{position:relative;z-index:1;max-width:900px;margin:0 auto;padding:20px 16px 80px}
+
+/* ─── HEADER ─── */
+.header{
+  background:linear-gradient(135deg,var(--card),var(--card2));
+  border:1px solid var(--accent);
+  border-radius:var(--r2);
+  padding:18px 26px;
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:20px;
+  box-shadow:0 0 50px rgba(0,229,176,.08),inset 0 1px 0 rgba(0,229,176,.15);
+  position:relative;overflow:hidden;
+}
+.header::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--accent),transparent);
+}
+.header-brand{display:flex;align-items:center;gap:12px}
+.header-icon{
+  width:40px;height:40px;background:var(--accent);border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  color:var(--bg);font-size:20px;flex-shrink:0;
+}
+.header-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:var(--accent);letter-spacing:-.5px}
+.header-sub{font-size:9px;color:var(--dim);margin-top:2px;letter-spacing:1px}
+.header-clock{text-align:right;font-size:10px;color:var(--dim);line-height:1.7}
+.live-dot{display:inline-block;width:6px;height:6px;background:var(--accent);border-radius:50%;margin-right:4px;animation:pulse 2s infinite;vertical-align:middle}
+@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(0,229,176,.4)}50%{opacity:.7;box-shadow:0 0 0 5px rgba(0,229,176,0)}}
+
+/* ─── TAB NAV ─── */
+.tab-nav{
+  display:flex;gap:8px;margin-bottom:20px;
+  background:var(--card);border:1px solid var(--border);
+  border-radius:var(--r2);padding:6px;
+}
+.tab-btn{
+  flex:1;padding:10px;border:none;border-radius:8px;
+  font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;
+  cursor:pointer;transition:all .2s;letter-spacing:.5px;
+  background:transparent;color:var(--dim);
+  display:flex;align-items:center;justify-content:center;gap:7px;
+}
+.tab-btn.active{background:var(--accent);color:var(--bg);box-shadow:0 4px 16px rgba(0,229,176,.25)}
+.tab-btn:not(.active):hover{color:var(--text);background:var(--border)}
+
+/* ─── TAB PANES ─── */
+.tab-pane{display:none}
+.tab-pane.active{display:block}
+
+/* ─── SECTION LABEL ─── */
+.sec-label{display:flex;align-items:center;gap:10px;margin:18px 0 8px}
+.sec-num{
+  width:22px;height:22px;background:var(--accent);color:var(--bg);
+  border-radius:4px;font-size:10px;font-weight:800;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.sec-title{font-size:10px;font-weight:700;color:var(--accent);letter-spacing:2px;text-transform:uppercase}
+.sec-line{flex:1;height:1px;background:linear-gradient(90deg,var(--border2),transparent)}
+
+/* ─── CARD ─── */
+.card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:var(--r2);padding:16px;margin-bottom:4px;
+  transition:border-color .2s;
+}
+.card:hover{border-color:var(--border2)}
+
+/* ─── UPLOAD ZONE ─── */
+.upload-zone{
+  border:2px dashed var(--border2);border-radius:8px;
+  min-height:160px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  cursor:pointer;transition:all .2s;background:var(--input);
+  overflow:hidden;color:var(--dim);font-size:12px;gap:8px;
+  position:relative;
+}
+.upload-zone:hover{border-color:var(--accent);background:rgba(0,229,176,.03);color:var(--accent)}
+.upload-zone.has-img{border-style:solid;border-color:var(--accent);height:auto;min-height:160px}
+.upload-zone.drag-over{border-color:var(--accent);background:rgba(0,229,176,.06);transform:scale(1.01)}
+.upload-zone img{width:100%;max-height:320px;object-fit:contain;border-radius:6px}
+.upload-icon{font-size:30px;opacity:.45}
+.upload-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center}
+
+/* ─── FORM ─── */
+.form-row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px}
+.form-group{display:flex;flex-direction:column;gap:5px;flex:1;min-width:90px}
+.form-group.w80{flex:0 0 80px}.form-group.w100{flex:0 0 100px}.form-group.w120{flex:0 0 120px}
+label{font-size:9px;font-weight:700;color:var(--blue);letter-spacing:1.5px;text-transform:uppercase}
+
+input[type=text],input[type=number],input[type=date],input[type=time],select,textarea{
+  background:var(--input);border:1px solid var(--border);border-radius:var(--r);
+  color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;
+  padding:8px 10px;outline:none;width:100%;transition:border-color .2s,box-shadow .2s;
+  -webkit-appearance:none;appearance:none;
+}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(0,229,176,.1)}
+select{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%235A7080' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 10px center;padding-right:28px;
+}
+textarea{resize:vertical;line-height:1.6;min-height:80px}
+
+/* ─── RADIO / CHECK ─── */
+.radio-group{display:flex;gap:8px;flex-wrap:wrap}
+.radio-btn{
+  display:flex;align-items:center;gap:6px;padding:7px 14px;
+  border:1px solid var(--border);border-radius:30px;cursor:pointer;
+  font-size:11px;font-weight:600;color:var(--dim);background:var(--input);
+  transition:all .15s;user-select:none;white-space:nowrap;
+}
+.radio-btn input{display:none}
+.radio-btn:has(input:checked).buy{border-color:var(--win);color:var(--win);background:rgba(34,197,94,.1);box-shadow:0 0 12px rgba(34,197,94,.15)}
+.radio-btn:has(input:checked).sell{border-color:var(--loss);color:var(--loss);background:rgba(239,68,68,.1);box-shadow:0 0 12px rgba(239,68,68,.15)}
+.radio-btn:has(input:checked).win{border-color:var(--win);color:var(--win);background:rgba(34,197,94,.1)}
+.radio-btn:has(input:checked).loss{border-color:var(--loss);color:var(--loss);background:rgba(239,68,68,.1)}
+.radio-btn:has(input:checked).be{border-color:var(--be);color:var(--be);background:rgba(245,158,11,.1)}
+
+.checklist-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px}
+.check-item{
+  display:flex;align-items:center;gap:8px;cursor:pointer;
+  padding:7px 10px;border-radius:var(--r);border:1px solid var(--border);
+  background:var(--input);font-size:10px;color:var(--dim);transition:all .15s;user-select:none;
+}
+.check-item input{display:none}
+.check-box{
+  width:14px;height:14px;border:1.5px solid var(--border2);border-radius:3px;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  transition:all .15s;font-size:10px;
+}
+.check-item:has(input:checked){border-color:var(--accent);color:var(--text);background:rgba(0,229,176,.05)}
+.check-item:has(input:checked) .check-box{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+
+.numbers-row{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:10px}
+
+/* ─── BUTTONS ─── */
+.btn{
+  padding:9px 18px;border:none;border-radius:var(--r);
+  font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;
+  cursor:pointer;transition:all .15s;letter-spacing:.5px;
+  display:inline-flex;align-items:center;gap:7px;white-space:nowrap;
+}
+.btn:hover{transform:translateY(-1px)}
+.btn:active{transform:translateY(0)}
+.btn-primary{background:var(--accent);color:var(--bg);padding:11px 22px;font-size:12px;box-shadow:0 4px 20px rgba(0,229,176,.25)}
+.btn-primary:hover{background:#00ffbf;box-shadow:0 6px 28px rgba(0,229,176,.35)}
+.btn-gold{background:var(--gold);color:var(--bg);padding:11px 22px;font-size:12px}
+.btn-danger{background:var(--loss);color:#fff}
+.btn-ghost{background:transparent;border:1px solid var(--border2);color:var(--dim)}
+.btn-ghost:hover{border-color:var(--dim);color:var(--text)}
+.btn-sm{padding:6px 11px;font-size:10px}
+
+/* ─── ACTION BAR (Journal) ─── */
+.action-bar{
+  position:sticky;bottom:0;
+  background:linear-gradient(0deg,var(--bg) 60%,transparent);
+  padding:20px 0 0;margin-top:24px;z-index:10;
+}
+.action-inner{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:var(--r2);padding:14px 18px;
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  box-shadow:0 -4px 30px rgba(0,0,0,.5);
+}
+.status-bar{flex:1;font-size:10px;color:var(--dim);min-width:140px}
+.entry-badge{
+  background:var(--card2);border:1px solid var(--border2);border-radius:20px;
+  padding:4px 12px;font-size:10px;color:var(--dim);
+  display:flex;align-items:center;gap:6px;
+}
+.entry-badge .count{font-size:14px;font-weight:800;color:var(--gold)}
+
+/* ─── BADGE ─── */
+.badge{padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:.5px}
+.badge-buy{background:rgba(34,197,94,.15);color:var(--win);border:1px solid rgba(34,197,94,.3)}
+.badge-sell{background:rgba(239,68,68,.15);color:var(--loss);border:1px solid rgba(239,68,68,.3)}
+.badge-win{background:rgba(34,197,94,.15);color:var(--win)}
+.badge-loss{background:rgba(239,68,68,.15);color:var(--loss)}
+.badge-be{background:rgba(245,158,11,.15);color:var(--be)}
+
+/* ─── ENTRY CARD ─── */
+.entry-card{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--r2);
+  padding:12px 16px;margin-bottom:8px;
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  animation:slideIn .3s ease;flex-wrap:wrap;
+}
+@keyframes slideIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+.entry-info{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.entry-no{font-size:10px;color:var(--dim);font-weight:700}
+.entry-pair{font-size:14px;font-weight:800;color:var(--text)}
+.entry-meta{font-size:10px;color:var(--dim)}
+
+/* ─── TOAST ─── */
+.toast{
+  position:fixed;bottom:90px;left:50%;
+  transform:translateX(-50%) translateY(10px);
+  background:var(--card2);border:1px solid var(--accent);color:var(--text);
+  padding:10px 20px;border-radius:30px;font-size:12px;font-weight:600;
+  z-index:9999;opacity:0;pointer-events:none;transition:all .25s;
+  white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,.5);
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ─── PDF PROGRESS ─── */
+.pdf-overlay{
+  display:none;position:fixed;inset:0;z-index:9999;
+  background:rgba(7,11,15,.92);align-items:center;justify-content:center;
+  flex-direction:column;gap:16px;backdrop-filter:blur(4px);
+}
+.pdf-overlay.active{display:flex}
+.pdf-spin{
+  width:48px;height:48px;border:3px solid var(--border2);
+  border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.pdf-overlay p{font-size:14px;color:var(--accent);font-weight:600}
+
+hr.dash{border:none;border-top:1px dashed var(--border2);margin:14px 0}
+
+/* ══════════════════════════════════════════
+   FRESH ZONE ANALYZER STYLES
+══════════════════════════════════════════ */
+
+/* Upload zone analyzer */
+.fz-upload-area{
+  background:var(--input);border:2px dashed var(--border2);border-radius:10px;
+  min-height:200px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  cursor:pointer;transition:all .2s;color:var(--dim);gap:10px;
+  position:relative;overflow:hidden;
+}
+.fz-upload-area:hover{border-color:var(--accent);background:rgba(0,229,176,.03);color:var(--accent)}
+.fz-upload-area.has-img{border-style:solid;border-color:var(--accent);padding:8px}
+.fz-upload-area.drag-over{border-color:var(--accent);background:rgba(0,229,176,.06);transform:scale(1.01)}
+.fz-upload-area img{max-width:100%;max-height:380px;object-fit:contain;border-radius:6px}
+
+/* Progress bar */
+.progress-wrap{background:var(--border);border-radius:20px;height:6px;overflow:hidden;margin:10px 0 4px}
+.progress-fill{height:100%;background:var(--accent);border-radius:20px;transition:width .4s ease;width:0%}
+.progress-msg{font-size:9px;color:var(--purple);letter-spacing:.5px;min-height:14px}
+
+/* Gauge */
+.gauge-wrap{display:flex;flex-direction:column;align-items:center;gap:4px}
+.gauge-svg{transform:rotate(180deg)}
+.gauge-val{font-size:28px;font-weight:800;font-family:'Syne',sans-serif;text-align:center}
+.gauge-lbl{font-size:8px;color:var(--dim);letter-spacing:1.5px;text-align:center}
+
+/* Result panels */
+.result-panel{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:var(--r2);padding:16px;margin-bottom:10px;
+  animation:slideIn .3s ease;
+}
+.result-panel.fresh{border-color:rgba(0,255,136,.3);background:linear-gradient(135deg,var(--card),#051508)}
+.result-panel.grab{border-color:rgba(255,170,0,.3);background:linear-gradient(135deg,var(--card),#151000)}
+.result-panel.spent{border-color:rgba(255,68,102,.3);background:linear-gradient(135deg,var(--card),#150508)}
+
+.rp-title{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px}
+
+/* Entry decision panel */
+.ed-panel{border-radius:var(--r2);padding:16px;margin-bottom:10px;animation:slideIn .3s ease;border:2px solid}
+.ed-panel.limit{background:var(--limit-bg);border-color:var(--limit-col)}
+.ed-panel.wait{background:var(--wait-bg);border-color:var(--wait-col)}
+.ed-panel.no{background:var(--no-bg);border-color:var(--no-col)}
+.ed-panel.sr{background:var(--sr-bg);border-color:var(--sr-col)}
+
+.ed-badge{padding:10px 16px;border-radius:8px;font-size:13px;font-weight:800;margin-bottom:12px;font-family:'Syne',sans-serif}
+.ed-badge.limit{background:var(--limit-col);color:var(--bg)}
+.ed-badge.wait{background:var(--wait-col);color:var(--bg)}
+.ed-badge.no{background:var(--no-col);color:#fff}
+.ed-badge.sr{background:var(--sr-col);color:#fff}
+
+.tech-row{display:flex;gap:8px;margin-bottom:6px;align-items:flex-start;flex-wrap:wrap}
+.tech-lbl{font-size:8px;color:var(--dim);letter-spacing:1px;min-width:90px;flex-shrink:0;padding-top:1px}
+.tech-val{font-size:11px;font-weight:700;flex:1}
+
+.indicator-row{
+  display:flex;align-items:flex-start;gap:8px;padding:5px 8px;
+  border-radius:var(--r);margin-bottom:4px;font-size:10px;
+}
+.indicator-row.pos{background:rgba(0,255,136,.05);color:var(--win)}
+.indicator-row.neg{background:rgba(255,68,102,.05);color:var(--loss)}
+.indicator-row.neu{background:rgba(77,166,255,.05);color:var(--blue)}
+
+.steps-list{list-style:none;display:flex;flex-direction:column;gap:5px;margin-top:8px}
+.steps-list li{display:flex;gap:8px;font-size:10px;align-items:flex-start}
+.step-num{
+  width:18px;height:18px;border-radius:4px;font-size:9px;font-weight:800;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+
+/* stat chips */
+.stat-chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.stat-chip{
+  background:var(--border);border-radius:8px;padding:6px 10px;
+  display:flex;flex-direction:column;align-items:center;gap:2px;
+}
+.chip-lbl{font-size:7px;color:var(--dim);letter-spacing:1px;text-transform:uppercase}
+.chip-val{font-size:12px;font-weight:800;color:var(--accent)}
+
+/* meta grid */
+.meta-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.meta-item{background:var(--input);border:1px solid var(--border);border-radius:8px;padding:8px}
+.meta-k{font-size:7px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;margin-bottom:3px}
+.meta-v{font-size:11px;font-weight:700;color:var(--accent)}
+
+/* Scrollable text */
+.scroll-text{
+  background:var(--input);border:1px solid var(--border);border-radius:8px;
+  padding:10px 12px;max-height:100px;overflow-y:auto;font-size:10px;
+  color:var(--text);line-height:1.7;
+}
+.scroll-text::-webkit-scrollbar{width:4px}
+.scroll-text::-webkit-scrollbar-track{background:var(--border)}
+.scroll-text::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+.disclaimer{
+  font-size:9px;color:var(--dim);text-align:center;
+  background:var(--card);border:1px solid var(--border);
+  border-radius:var(--r);padding:8px 12px;margin-top:10px;
+}
+
+/* ─── RESPONSIVE ─── */
+@media(max-width:600px){
+  .numbers-row{grid-template-columns:repeat(3,1fr)}
+  .checklist-grid{grid-template-columns:1fr}
+  .header-title{font-size:16px}
+  .meta-grid{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+</head>
+<body>
+
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+<div class="orb orb3"></div>
+
+<div class="toast" id="toast"></div>
+<div class="pdf-overlay" id="pdfOverlay">
+  <div class="pdf-spin"></div>
+  <p>Membuat PDF…</p>
+</div>
+
+<div class="wrapper">
+
+  <!-- ─── HEADER ─── -->
+  <div class="header">
+    <div class="header-brand">
+      <div class="header-icon">📊</div>
+      <div>
+        <div class="header-title">TRADING SUITE PRO</div>
+        <div class="header-sub">JOURNAL + FRESH ZONE ANALYZER</div>
+      </div>
+    </div>
+    <div class="header-clock">
+      <div><span class="live-dot"></span><span id="clock">--:--:--</span></div>
+      <div id="clockDate" style="margin-top:2px"></div>
+    </div>
+  </div>
+
+  <!-- ─── TAB NAV ─── -->
+  <div class="tab-nav">
+    <button class="tab-btn active" onclick="switchTab('journal',this)">📒 TRADING JOURNAL</button>
+    <button class="tab-btn" onclick="switchTab('analyzer',this)">🔍 FRESH ZONE ANALYZER</button>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       TAB 1 — TRADING JOURNAL
+  ══════════════════════════════════════ -->
+  <div class="tab-pane active" id="tab-journal">
+
+    <!-- 1. Chart Upload -->
+    <div class="sec-label"><div class="sec-num">1</div><div class="sec-title">Chart / Screenshot</div><div class="sec-line"></div></div>
+    <div class="card">
+      <div class="upload-zone" id="jUploadZone"
+           ondragover="jDragOver(event)" ondragleave="jDragLeave(event)"
+           ondrop="jDrop(event)" onclick="document.getElementById('jFileInput').click()">
+        <div class="upload-icon" id="jUploadIcon">📈</div>
+        <div id="jUploadText">Klik atau drag & drop gambar chart</div>
+        <div style="font-size:10px;color:var(--dim2)">PNG · JPG · WEBP</div>
+        <img id="jPreviewImg" style="display:none;padding:8px" alt="Chart Preview">
+      </div>
+      <input type="file" id="jFileInput" accept="image/*" style="display:none" onchange="jHandleFile(event)">
+      <div class="upload-actions">
+        <button class="btn btn-primary btn-sm" onclick="document.getElementById('jFileInput').click()">📁 Upload</button>
+        <button class="btn btn-ghost btn-sm" onclick="jClearImage()">✕ Hapus</button>
+        <span id="jImageName" style="font-size:10px;color:var(--dim)"></span>
+      </div>
+    </div>
+
+    <!-- 2. Entry Trading -->
+    <div class="sec-label"><div class="sec-num">2</div><div class="sec-title">Entry Trading</div><div class="sec-line"></div></div>
+    <div class="card">
+      <div class="form-row">
+        <div class="form-group w100"><label>Entry Ke #</label><input type="number" id="jEntryNo" value="1" min="1"></div>
+        <div class="form-group"><label>Pair / Instrumen</label>
+          <select id="jPair">
+            <option>XAUUSD</option><option>EURUSD</option><option>GBPUSD</option>
+            <option>USDJPY</option><option>BTCUSD</option><option>ETHUSD</option>
+            <option>NAS100</option><option>US30</option><option>SP500</option>
+            <option>USOIL</option><option>GBPJPY</option><option>AUDUSD</option>
+            <option>NZDUSD</option><option>USDCAD</option><option>USDCHF</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Custom Pair</label><input type="text" id="jCustomPair" placeholder="Ketik sendiri…"></div>
+      </div>
+    </div>
+
+    <!-- 3. Waktu -->
+    <div class="sec-label"><div class="sec-num">3</div><div class="sec-title">Waktu Entry</div><div class="sec-line"></div></div>
+    <div class="card">
+      <div class="form-row">
+        <div class="form-group"><label>Tanggal</label><input type="date" id="jDate"></div>
+        <div class="form-group w120"><label>Jam (HH:MM)</label><input type="time" id="jTime"></div>
+        <div class="form-group"><label>Sesi Trading</label>
+          <select id="jSession">
+            <option>Asia</option><option selected>London</option>
+            <option>New York</option><option>London/NY Overlap</option><option>Lainnya</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Status Entry -->
+    <div class="sec-label"><div class="sec-num">4</div><div class="sec-title">Status Entry</div><div class="sec-line"></div></div>
+    <div class="card">
+      <div class="form-row" style="margin-bottom:14px">
+        <div>
+          <label style="display:block;margin-bottom:7px">Arah Trade</label>
+          <div class="radio-group">
+            <label class="radio-btn buy"><input type="radio" name="jDir" value="BUY" checked>▲ BUY</label>
+            <label class="radio-btn sell"><input type="radio" name="jDir" value="SELL">▼ SELL</label>
+          </div>
+        </div>
+        <div>
+          <label style="display:block;margin-bottom:7px">Hasil Trade</label>
+          <div class="radio-group">
+            <label class="radio-btn win"><input type="radio" name="jStatus" value="WIN" checked>✅ WIN</label>
+            <label class="radio-btn loss"><input type="radio" name="jStatus" value="LOSS">❌ LOSS</label>
+            <label class="radio-btn be"><input type="radio" name="jStatus" value="BE">➡ BE</label>
+          </div>
+        </div>
+      </div>
+      <hr class="dash">
+      <label style="display:block;margin-bottom:8px">✔ Konfirmasi Kondisi</label>
+      <div class="checklist-grid">
+        <label class="check-item"><input type="checkbox" id="ck_trend"><div class="check-box">✓</div>Trend Sesuai HTF</label>
+        <label class="check-item"><input type="checkbox" id="ck_struktur"><div class="check-box">✓</div>Ada Struktur Break</label>
+        <label class="check-item"><input type="checkbox" id="ck_zone"><div class="check-box">✓</div>Supply/Demand Zone</label>
+        <label class="check-item"><input type="checkbox" id="ck_candle"><div class="check-box">✓</div>Konfirmasi Candle</label>
+        <label class="check-item"><input type="checkbox" id="ck_volume"><div class="check-box">✓</div>Volume Mendukung</label>
+        <label class="check-item"><input type="checkbox" id="ck_rr"><div class="check-box">✓</div>Risk/Reward ≥ 1:2</label>
+        <label class="check-item"><input type="checkbox" id="ck_news"><div class="check-box">✓</div>Tidak Ada News Besar</label>
+        <label class="check-item"><input type="checkbox" id="ck_premium"><div class="check-box">✓</div>Entry di Zona Premium/Discount</label>
+      </div>
+      <div class="numbers-row">
+        <div class="form-group"><label>SL (pips)</label><input type="number" id="jSL" placeholder="0"></div>
+        <div class="form-group"><label>TP (pips)</label><input type="number" id="jTP" placeholder="0"></div>
+        <div class="form-group"><label>Lot Size</label><input type="number" id="jLot" step="0.01" placeholder="0.01"></div>
+        <div class="form-group"><label>R:R</label><input type="text" id="jRR" placeholder="1:2"></div>
+        <div class="form-group"><label>P&amp;L ($)</label><input type="number" id="jPnL" placeholder="0"></div>
+      </div>
+    </div>
+
+    <!-- 5. Alasan -->
+    <div class="sec-label"><div class="sec-num">5</div><div class="sec-title">Alasan Entry</div><div class="sec-line"></div></div>
+    <div class="card"><textarea id="jAlasan" rows="4" placeholder="Setup, confluences, market structure…"></textarea></div>
+
+    <!-- 6. Catatan -->
+    <div class="sec-label"><div class="sec-num">6</div><div class="sec-title">Catatan Entry</div><div class="sec-line"></div></div>
+    <div class="card"><textarea id="jCatatan1" rows="3" placeholder="Psikologi trading, kondisi pasar…"></textarea></div>
+
+    <!-- 7. Review -->
+    <div class="sec-label"><div class="sec-num">7</div><div class="sec-title">Review &amp; Lesson Learned</div><div class="sec-line"></div></div>
+    <div class="card"><textarea id="jCatatan2" rows="3" placeholder="Pelajaran dari trade ini…"></textarea></div>
+
+    <!-- Action Bar -->
+    <div class="action-bar">
+      <div class="action-inner">
+        <button class="btn btn-primary" onclick="jExportPDF()">🖨️ EXPORT PDF</button>
+        <button class="btn btn-gold" onclick="jSaveEntry()">💾 SIMPAN</button>
+        <button class="btn btn-ghost" onclick="jReset()">🗑️ RESET</button>
+        <div class="entry-badge"><span>Tersimpan</span><span class="count" id="jCount">0</span></div>
+        <div class="status-bar"><span id="jStatus">Siap — isi form dan export ke PDF</span></div>
+      </div>
+    </div>
+
+    <!-- Saved Entries -->
+    <div id="jEntriesSection" style="display:none;margin-top:28px">
+      <div class="sec-label" style="margin-top:8px">
+        <div class="sec-num" style="background:var(--gold);color:var(--bg)">★</div>
+        <div class="sec-title" style="color:var(--gold)">Entry Tersimpan</div>
+        <div class="sec-line" style="background:linear-gradient(90deg,rgba(245,200,66,.3),transparent)"></div>
+        <button class="btn btn-ghost btn-sm" onclick="jClearAll()">Hapus Semua</button>
+      </div>
+      <div id="jEntriesList"></div>
+    </div>
+
+  </div><!-- /tab-journal -->
+
+  <!-- ══════════════════════════════════════
+       TAB 2 — FRESH ZONE ANALYZER
+  ══════════════════════════════════════ -->
+  <div class="tab-pane" id="tab-analyzer">
+
+    <!-- Legend -->
+    <div class="card" style="margin-bottom:12px">
+      <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center">
+        <span style="font-size:9px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;flex-shrink:0">LEGEND:</span>
+        <span style="font-size:10px;color:var(--limit-col)">● Limit Order [score=100]</span>
+        <span style="font-size:10px;color:var(--wait-col)">● Tunggu Konfirmasi [70–99]</span>
+        <span style="font-size:10px;color:var(--no-col)">● Jangan Entry [&lt;70]</span>
+        <span style="font-size:10px;color:var(--sr-col)">● SR Violated [touch&gt;1×]</span>
+      </div>
+    </div>
+
+    <!-- Upload Chart -->
+    <div class="sec-label"><div class="sec-num">1</div><div class="sec-title">Upload Chart untuk Analisis</div><div class="sec-line"></div></div>
+    <div class="card">
+      <div class="fz-upload-area" id="fzUploadArea"
+           ondragover="fzDragOver(event)" ondragleave="fzDragLeave(event)"
+           ondrop="fzDrop(event)" onclick="document.getElementById('fzFileInput').click()">
+        <div class="upload-icon">🔍</div>
+        <div style="font-size:12px">Klik atau drag &amp; drop chart candlestick</div>
+        <div style="font-size:10px;color:var(--dim2)">PNG · JPG · WEBP — Engine: RGB Pixel Analysis</div>
+        <img id="fzPreviewImg" style="display:none" alt="Chart">
+      </div>
+      <input type="file" id="fzFileInput" accept="image/*" style="display:none" onchange="fzHandleFile(event)">
+      <div class="upload-actions" style="margin-top:10px">
+        <button class="btn btn-primary btn-sm" onclick="document.getElementById('fzFileInput').click()">📁 Pilih Gambar</button>
+        <button class="btn btn-ghost btn-sm" id="fzAnalyzeBtn" onclick="fzStartAnalysis()" style="display:none">▶ ANALISIS</button>
+        <button class="btn btn-ghost btn-sm" onclick="fzClear()">✕ Clear</button>
+        <span id="fzImgName" style="font-size:10px;color:var(--dim)"></span>
+      </div>
+      <div class="progress-wrap" id="fzProgressWrap" style="display:none">
+        <div class="progress-fill" id="fzProgressFill"></div>
+      </div>
+      <div class="progress-msg" id="fzProgressMsg"></div>
+      <div style="margin-top:10px;font-size:9px;color:var(--dim);line-height:1.8">
+        <span style="color:var(--purple)">Pipeline:</span>
+        RGB Pixel Scan → Chart Region Detect → Candle Reconstruct → SMC Zone Pattern → Freshness Fuzzy → Entry Decision
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div id="fzResults"></div>
+
+  </div><!-- /tab-analyzer -->
+
+</div><!-- /wrapper -->
+
+<script>
+/* ═══════════════════════════════════════════════════════
+   GLOBAL UTILITIES
+═══════════════════════════════════════════════════════ */
+function showToast(msg,dur=2500){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),dur);
+}
+
+function switchTab(name,btn){
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  btn.classList.add('active');
+}
+
+// Clock
+function updateClock(){
+  const n=new Date();
+  document.getElementById('clock').textContent=n.toLocaleTimeString('id-ID',{hour12:false});
+  document.getElementById('clockDate').textContent=n.toLocaleDateString('id-ID',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});
+}
+updateClock();setInterval(updateClock,1000);
+
+// Init date/time
+(function(){
+  const n=new Date();
+  document.getElementById('jDate').value=n.toISOString().slice(0,10);
+  document.getElementById('jTime').value=n.toTimeString().slice(0,5);
+})();
+
+/* ═══════════════════════════════════════════════════════
+   TAB 1 — TRADING JOURNAL
+═══════════════════════════════════════════════════════ */
+let jEntries=[];
+let jImageDataURL=null;
+
+function jSetStatus(msg){document.getElementById('jStatus').textContent=msg}
+
+/* Image upload */
+function jHandleFile(e){const f=e.target.files[0];if(f)jLoadImage(f)}
+function jLoadImage(f){
+  const r=new FileReader();
+  r.onload=e=>{
+    jImageDataURL=e.target.result;
+    const zone=document.getElementById('jUploadZone');
+    const prev=document.getElementById('jPreviewImg');
+    prev.src=jImageDataURL;prev.style.display='block';
+    document.getElementById('jUploadIcon').style.display='none';
+    document.getElementById('jUploadText').style.display='none';
+    zone.classList.add('has-img');
+    document.getElementById('jImageName').textContent='📎 '+f.name;
+    showToast('✔ Gambar dimuat: '+f.name);
+    jSetStatus('✔ Gambar siap: '+f.name);
+  };r.readAsDataURL(f);
+}
+function jClearImage(){
+  jImageDataURL=null;
+  const prev=document.getElementById('jPreviewImg');
+  prev.style.display='none';prev.src='';
+  document.getElementById('jUploadIcon').style.display='';
+  document.getElementById('jUploadText').style.display='';
+  document.getElementById('jUploadZone').classList.remove('has-img');
+  document.getElementById('jImageName').textContent='';
+  document.getElementById('jFileInput').value='';
+}
+function jDragOver(e){e.preventDefault();document.getElementById('jUploadZone').classList.add('drag-over')}
+function jDragLeave(){document.getElementById('jUploadZone').classList.remove('drag-over')}
+function jDrop(e){
+  e.preventDefault();document.getElementById('jUploadZone').classList.remove('drag-over');
+  const f=e.dataTransfer.files[0];if(f&&f.type.startsWith('image/'))jLoadImage(f);
+}
+
+/* Collect data */
+function jCollect(){
+  const cp=document.getElementById('jCustomPair').value.trim();
+  const pair=cp||document.getElementById('jPair').value;
+  return{
+    no:document.getElementById('jEntryNo').value,pair,
+    date:document.getElementById('jDate').value,
+    time:document.getElementById('jTime').value,
+    session:document.getElementById('jSession').value,
+    direction:document.querySelector('input[name="jDir"]:checked').value,
+    status:document.querySelector('input[name="jStatus"]:checked').value,
+    sl:document.getElementById('jSL').value,
+    tp:document.getElementById('jTP').value,
+    lot:document.getElementById('jLot').value,
+    rr:document.getElementById('jRR').value,
+    pnl:document.getElementById('jPnL').value,
+    checks:{
+      trend:document.getElementById('ck_trend').checked,
+      struktur:document.getElementById('ck_struktur').checked,
+      zone:document.getElementById('ck_zone').checked,
+      candle:document.getElementById('ck_candle').checked,
+      volume:document.getElementById('ck_volume').checked,
+      rr:document.getElementById('ck_rr').checked,
+      news:document.getElementById('ck_news').checked,
+      premium:document.getElementById('ck_premium').checked,
+    },
+    checkLabels:{
+      trend:'Trend Sesuai HTF',struktur:'Ada Struktur Break',
+      zone:'Supply/Demand Zone',candle:'Konfirmasi Candle',
+      volume:'Volume Mendukung',rr:'Risk/Reward >= 1:2',
+      news:'Tidak Ada News Besar',premium:'Entry di Zona Premium/Discount',
+    },
+    alasan:document.getElementById('jAlasan').value.trim(),
+    catatan1:document.getElementById('jCatatan1').value.trim(),
+    catatan2:document.getElementById('jCatatan2').value.trim(),
+    imageDataURL:jImageDataURL,
+    createdAt:new Date().toLocaleString('id-ID'),
+  };
+}
+
+function jSaveEntry(){
+  const d=jCollect();jEntries.push(d);
+  document.getElementById('jCount').textContent=jEntries.length;
+  jRenderList();
+  showToast(`✔ Entry #${d.no} ${d.pair} tersimpan!`);
+  jSetStatus(`✔ Entry #${d.no} disimpan. Total: ${jEntries.length}`);
+  document.getElementById('jEntryNo').value=parseInt(d.no)+1;
+}
+
+function jRenderList(){
+  const sec=document.getElementById('jEntriesSection');
+  const list=document.getElementById('jEntriesList');
+  sec.style.display=jEntries.length?'':'none';
+  list.innerHTML=jEntries.map((d,i)=>`
+    <div class="entry-card">
+      <div class="entry-info">
+        <span class="entry-no">#${d.no}</span>
+        <span class="entry-pair">${d.pair}</span>
+        <span class="badge badge-${d.direction.toLowerCase()}">${d.direction==='BUY'?'▲':'▼'} ${d.direction}</span>
+        <span class="badge badge-${d.status.toLowerCase()}">${d.status}</span>
+        <span class="entry-meta">${d.date} ${d.time} · ${d.session}</span>
+        ${d.pnl?`<span class="badge ${d.status==='WIN'?'badge-win':'badge-loss'}">$${d.pnl}</span>`:''}
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="jRemoveEntry(${i})">✕</button>
+    </div>`).join('');
+}
+
+function jRemoveEntry(i){jEntries.splice(i,1);document.getElementById('jCount').textContent=jEntries.length;jRenderList();showToast('Entry dihapus')}
+function jClearAll(){if(!confirm('Hapus semua entry?'))return;jEntries=[];document.getElementById('jCount').textContent=0;jRenderList();showToast('Semua entry dihapus')}
+
+function jReset(){
+  if(!confirm('Reset semua isian form?'))return;
+  document.getElementById('jPair').value='XAUUSD';
+  document.getElementById('jCustomPair').value='';
+  const n=new Date();
+  document.getElementById('jDate').value=n.toISOString().slice(0,10);
+  document.getElementById('jTime').value=n.toTimeString().slice(0,5);
+  document.getElementById('jSession').value='London';
+  document.querySelector('input[name="jDir"][value="BUY"]').checked=true;
+  document.querySelector('input[name="jStatus"][value="WIN"]').checked=true;
+  ['jSL','jTP','jLot','jRR','jPnL'].forEach(id=>document.getElementById(id).value='');
+  ['ck_trend','ck_struktur','ck_zone','ck_candle','ck_volume','ck_rr','ck_news','ck_premium'].forEach(id=>document.getElementById(id).checked=false);
+  ['jAlasan','jCatatan1','jCatatan2'].forEach(id=>document.getElementById(id).value='');
+  jClearImage();jSetStatus('Form direset');showToast('Form direset');
+}
+
+/* Export PDF */
+async function jExportPDF(){
+  const cur=jCollect();
+  const all=[...jEntries,cur];
+  if(!all.length){showToast('Tidak ada data');return}
+  document.getElementById('pdfOverlay').classList.add('active');
+  try{
+    await new Promise(r=>setTimeout(r,100));
+    const{jsPDF}=window.jspdf;
+    const doc=new jsPDF({unit:'mm',format:'a4',orientation:'portrait'});
+    const pw=210,ph=297,mg=14,cw=210-mg*2;
+    const COL={bg:[8,12,16],card:[17,24,32],card2:[22,30,40],accent:[0,229,176],gold:[245,200,66],win:[34,197,94],loss:[239,68,68],be:[245,158,11],text:[226,235,245],dim:[107,125,143],border:[30,42,56],blue:[77,166,255]};
+    const sf=c=>doc.setFillColor(...c),sd=c=>doc.setDrawColor(...c),sc=c=>doc.setTextColor(...c),ff=(s,st='normal')=>{doc.setFontSize(s);doc.setFont('Courier',st)};
+    const fillPg=()=>{sf(COL.bg);doc.rect(0,0,pw,ph,'F')};
+    let pn=1;
+    const footer=()=>{sc(COL.dim);ff(7);doc.text(`Trading Suite Pro | Hal. ${pn} | ${new Date().toLocaleString('id-ID')}`,pw/2,ph-8,{align:'center'})};
+
+    fillPg();
+    sf(COL.card);sd(COL.accent);doc.setLineWidth(.5);doc.roundedRect(mg,20,cw,32,3,3,'FD');
+    sc(COL.accent);ff(20,'bold');doc.text('TRADING JOURNAL PRO',pw/2,32,{align:'center'});
+    const now=new Date();
+    sc(COL.dim);ff(9);doc.text(`Dicetak: ${now.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}  |  Total: ${all.length} entry`,pw/2,40,{align:'center'});
+    footer();
+
+    for(let ei=0;ei<all.length;ei++){
+      const d=all[ei];doc.addPage();pn++;fillPg();let y=mg;
+      const dc=d.direction==='BUY'?COL.win:COL.loss;
+      const sc2=d.status==='WIN'?COL.win:d.status==='LOSS'?COL.loss:COL.be;
+      sf(COL.card);sd(COL.gold);doc.setLineWidth(.5);doc.roundedRect(mg,y,cw,14,2,2,'FD');
+      sf(COL.gold);doc.rect(mg,y,2.5,14,'F');
+      sc(COL.gold);ff(12,'bold');doc.text(`Entry #${d.no}  ${d.pair}  ${d.direction==='BUY'?'▲':'▼'} ${d.direction}`,mg+6,y+5.5);
+      sc(COL.dim);ff(8);doc.text(`${d.date}  ${d.time}  (${d.session})`,mg+6,y+10.5);
+      sf(sc2);doc.roundedRect(pw-mg-18,y+2.5,17,9,2,2,'F');
+      sc(COL.bg);ff(9,'bold');doc.text(d.status,pw-mg-9.5,y+8.5,{align:'center'});
+      y+=18;
+
+      if(d.imageDataURL){
+        try{
+          await new Promise(res=>{
+            const ti=new Image();
+            ti.onload=()=>{
+              const mh=65,mw=cw;let iw=ti.width,ih=ti.height;
+              let r=ih/iw,dw=mw,dh=dw*r;
+              if(dh>mh){dh=mh;dw=dh/r}
+              const ix=mg+(cw-dw)/2;
+              sf(COL.card);sd(COL.accent);doc.setLineWidth(.4);doc.roundedRect(mg,y,cw,dh+4,2,2,'FD');
+              try{const ext=d.imageDataURL.includes('png')?'PNG':'JPEG';doc.addImage(d.imageDataURL,ext,ix,y+2,dw,dh);}catch(e){doc.addImage(d.imageDataURL,'JPEG',ix,y+2,dw,dh);}
+              y+=dh+8;res();
+            };ti.onerror=()=>res();ti.src=d.imageDataURL;
+          });
+        }catch(e){}
+      }
+
+      const rows=[[['PAIR',d.pair],['ARAH',`${d.direction==='BUY'?'▲':'▼'} ${d.direction}`],['STATUS',d.status]],[['TANGGAL',`${d.date} ${d.time}`],['SESI',d.session],['P&L',d.pnl?`$${d.pnl}`:'-']],[['SL',d.sl||'-'],['TP',d.tp||'-'],['LOT/R:R',`${d.lot||'-'} / ${d.rr||'-'}`]]];
+      const colW=cw/3,rh=11;
+      rows.forEach((row,ri)=>{
+        const ry=y+ri*rh;sf(ri%2===0?COL.card:COL.card2);doc.rect(mg,ry,cw,rh,'F');sd(COL.border);doc.setLineWidth(.2);doc.rect(mg,ry,cw,rh);
+        row.forEach((cell,ci)=>{
+          const cx=mg+ci*colW;sc(COL.blue);ff(7,'bold');doc.text(cell[0],cx+3,ry+4.5);
+          if(ci===1&&ri===0)sc(dc);else if(ci===2&&ri===0)sc(sc2);else if(ci===2&&ri===1)sc(d.status==='WIN'?COL.win:COL.loss);else sc(COL.text);
+          ff(9,'bold');doc.text(String(cell[1]),cx+3,ry+9);
+        });
+      });y+=rows.length*rh+6;
+
+      sc(COL.accent);ff(8,'bold');doc.text('KONFIRMASI KONDISI',mg,y);y+=5;
+      const cks=Object.keys(d.checks);const ckrh=6.5,ckcw=cw/2;
+      for(let ci=0;ci<cks.length;ci+=2){
+        const ry=y+(ci/2)*ckrh;
+        for(let cc=0;cc<2;cc++){
+          const key=cks[ci+cc];if(!key)break;
+          const cx=mg+cc*ckcw;
+          sc(d.checks[key]?COL.win:COL.dim);ff(8);
+          doc.text(`${d.checks[key]?'[✓]':'[ ]'}  ${d.checkLabels[key]||key}`,cx+2,ry+4.5);
+        }
+      }y+=Math.ceil(cks.length/2)*ckrh+6;
+
+      const drawSec=(title,text)=>{
+        if(!text)return;
+        if(y>ph-mg-30){footer();doc.addPage();pn++;fillPg();y=mg}
+        sc(COL.accent);ff(8,'bold');doc.text(title,mg,y);y+=5;
+        sf(COL.card);sd(COL.border);doc.setLineWidth(.3);
+        const w2=doc.splitTextToSize(text,cw-12);const bh=w2.length*4.5+8;
+        if(y+bh>ph-mg-15){footer();doc.addPage();pn++;fillPg();y=mg;sc(COL.accent);ff(8,'bold');doc.text(title+' (lanjutan)',mg,y);y+=5}
+        doc.roundedRect(mg,y,cw,bh,2,2,'FD');sf(COL.accent);doc.rect(mg,y,2.5,bh,'F');
+        sc(COL.text);ff(8);doc.text(w2,mg+6,y+5.5);y+=bh+6;
+      };
+      drawSec('ALASAN ENTRY',d.alasan);
+      drawSec('CATATAN ENTRY',d.catatan1);
+      drawSec('REVIEW & LESSON LEARNED',d.catatan2);
+      footer();
+    }
+
+    if(all.length>1){
+      doc.addPage();pn++;fillPg();let y=mg;
+      sf(COL.card);sd(COL.gold);doc.setLineWidth(.5);doc.roundedRect(mg,y,cw,14,2,2,'FD');
+      sc(COL.gold);ff(14,'bold');doc.text('RINGKASAN TRADING',pw/2,y+9,{align:'center'});y+=20;
+      const ws=all.filter(d=>d.status==='WIN').length,ls=all.filter(d=>d.status==='LOSS').length,bs=all.filter(d=>d.status==='BE').length,tot=all.length;
+      const wr=tot>0?((ws/tot)*100).toFixed(1):'0';
+      const tp2=all.reduce((s,d)=>s+(parseFloat(d.pnl)||0),0);
+      const stats=[['TOTAL ENTRY',tot,COL.blue],['WIN',ws,COL.win],['LOSS',ls,COL.loss],['BE',bs,COL.be],[`WIN RATE`,`${wr}%`,parseFloat(wr)>=50?COL.win:COL.loss],['TOTAL P&L',`$${tp2.toFixed(2)}`,tp2>=0?COL.win:COL.loss]];
+      const sw=cw/3,sh=18;
+      stats.forEach((st,i)=>{
+        const r2=Math.floor(i/3),c2=i%3,sx=mg+c2*sw,sy=y+r2*(sh+4);
+        sf(COL.card2);sd(COL.border);doc.setLineWidth(.3);doc.roundedRect(sx+1,sy,sw-2,sh,2,2,'FD');
+        sc(COL.dim);ff(7,'bold');doc.text(st[0],sx+sw/2,sy+5.5,{align:'center'});
+        sc(st[2]);ff(14,'bold');doc.text(String(st[1]),sx+sw/2,sy+14,{align:'center'});
+      });y+=Math.ceil(stats.length/3)*(sh+4)+10;
+      footer();
+    }
+
+    const fn=`TradingJournal_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}.pdf`;
+    doc.save(fn);showToast(`✔ PDF berhasil didownload! (${all.length} entry)`,4000);
+    jSetStatus(`✔ PDF: ${fn}`);
+  }catch(err){console.error(err);showToast('✗ Gagal: '+err.message,4000)}
+  finally{document.getElementById('pdfOverlay').classList.remove('active')}
+}
+
+
+/* ═══════════════════════════════════════════════════════
+   TAB 2 — FRESH ZONE ANALYZER (RGB ENGINE)
+═══════════════════════════════════════════════════════ */
+let fzImagePath=null;
+let fzImageDataURL=null;
+let fzRunning=false;
+
+/* ── Image Upload ── */
+function fzHandleFile(e){const f=e.target.files[0];if(f)fzLoadImage(f)}
+function fzLoadImage(f){
+  const r=new FileReader();
+  r.onload=e=>{
+    fzImageDataURL=e.target.result;
+    const area=document.getElementById('fzUploadArea');
+    const prev=document.getElementById('fzPreviewImg');
+    prev.src=fzImageDataURL;prev.style.display='block';
+    area.classList.add('has-img');
+    area.querySelector('.upload-icon').style.display='none';
+    area.querySelectorAll('div').forEach(d=>{if(d.textContent.includes('Klik'))d.style.display='none'});
+    document.getElementById('fzImgName').textContent='📎 '+f.name;
+    document.getElementById('fzAnalyzeBtn').style.display='';
+    showToast('✔ Gambar dimuat — klik ANALISIS');
+  };r.readAsDataURL(f);
+}
+function fzClear(){
+  fzImageDataURL=null;fzImagePath=null;
+  const area=document.getElementById('fzUploadArea');
+  const prev=document.getElementById('fzPreviewImg');
+  prev.style.display='none';prev.src='';
+  area.classList.remove('has-img');
+  area.querySelectorAll('.upload-icon,div').forEach(el=>el.style.display='');
+  document.getElementById('fzImgName').textContent='';
+  document.getElementById('fzAnalyzeBtn').style.display='none';
+  document.getElementById('fzFileInput').value='';
+  document.getElementById('fzResults').innerHTML='';
+  fzSetProgress(0,'');
+}
+function fzDragOver(e){e.preventDefault();document.getElementById('fzUploadArea').classList.add('drag-over')}
+function fzDragLeave(){document.getElementById('fzUploadArea').classList.remove('drag-over')}
+function fzDrop(e){
+  e.preventDefault();document.getElementById('fzUploadArea').classList.remove('drag-over');
+  const f=e.dataTransfer.files[0];if(f&&f.type.startsWith('image/'))fzLoadImage(f);
+}
+
+function fzSetProgress(pct,msg){
+  const wrap=document.getElementById('fzProgressWrap');
+  const fill=document.getElementById('fzProgressFill');
+  const msgEl=document.getElementById('fzProgressMsg');
+  if(pct>0){wrap.style.display='';fill.style.width=pct+'%'}
+  else{wrap.style.display='none';fill.style.width='0%'}
+  msgEl.textContent=msg?`[${pct}%] ${msg}`:'';
+}
+
+/* ── Main Analysis ── */
+async function fzStartAnalysis(){
+  if(!fzImageDataURL||fzRunning)return;
+  fzRunning=true;
+  document.getElementById('fzAnalyzeBtn').disabled=true;
+  document.getElementById('fzAnalyzeBtn').textContent='⏳ Menganalisis…';
+  document.getElementById('fzResults').innerHTML='';
+
+  try{
+    const result=await fzAnalyze(fzImageDataURL,fzSetProgress);
+    fzRenderResult(result);
+  }catch(err){
+    console.error(err);
+    document.getElementById('fzResults').innerHTML=`
+      <div class="result-panel spent">
+        <div class="rp-title" style="color:var(--loss)">ERROR</div>
+        <p style="font-size:11px;color:var(--loss)">${err.message}</p>
+      </div>`;
+    showToast('Error: '+err.message,4000);
+  }finally{
+    fzRunning=false;
+    document.getElementById('fzAnalyzeBtn').disabled=false;
+    document.getElementById('fzAnalyzeBtn').textContent='▶ ANALISIS';
+    fzSetProgress(0,'');
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   RGB ANALYSIS ENGINE (Pure JS, no API)
+═══════════════════════════════════════════════ */
+async function fzAnalyze(dataURL,progress){
+  progress(5,'Memuat gambar…');
+  const img=await fzLoadImg(dataURL);
+  const canvas=document.createElement('canvas');
+  const maxSide=1200;
+  let w=img.width,h=img.height;
+  if(Math.max(w,h)>maxSide){const s=maxSide/Math.max(w,h);w=Math.round(w*s);h=Math.round(h*s)}
+  canvas.width=w;canvas.height=h;
+  const ctx=canvas.getContext('2d');ctx.drawImage(img,0,0,w,h);
+  const id=ctx.getImageData(0,0,w,h);
+  const pixels=id.data;
+
+  progress(15,'Menganalisis statistik warna…');
+  const imgStats=fzImgStats(pixels,w,h);
+
+  progress(25,'Mendeteksi batas chart…');
+  const bounds=fzChartBounds(pixels,w,h);
+
+  progress(40,'Merekonstruksi candle dari piksel RGB…');
+  const nC=Math.min(80,Math.max(10,Math.round(w/12)));
+  const candles=fzReconstructCandles(pixels,w,h,bounds,nC);
+  const activeCandles=candles.filter(c=>c.type!=='empty');
+
+  progress(55,'Mengidentifikasi zona Supply & Demand…');
+  const zones=fzDetectZones(activeCandles);
+  const visualZones=fzVisualZones(activeCandles);
+
+  progress(70,'Menjalankan Fuzzy Logic Engine…');
+  const zoneResults=zones.map(z=>{
+    const fa=fzFreshness(z,activeCandles,visualZones);
+    fa.zone_type=z.type;fa.pattern=z.pattern||'';
+    return fa;
+  });
+
+  progress(85,'Entry Decision Engine…');
+  const result=fzAggregate(zoneResults,visualZones,activeCandles,imgStats);
+  progress(100,'Selesai!');
+  return result;
+}
+
+function fzLoadImg(dataURL){
+  return new Promise((res,rej)=>{
+    const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=dataURL;
+  });
+}
+
+/* Color classify */
+function fzClassify(r,g,b){
+  const max=Math.max(r,g,b)/255,min=Math.min(r,g,b)/255;
+  const d=max-min;
+  if(max>0.92&&d<0.12)return'bg';
+  if(max<0.1)return'bg';
+  if(d<0.15&&max>0.75)return'bg';
+  if(d<0.12)return'neu';
+  let h=0;
+  if(d>0){
+    if(max===r/255)h=(((g-b)/255/d)%6)/6;
+    else if(max===g/255)h=((b-r)/255/d+2)/6;
+    else h=((r-g)/255/d+4)/6;
+    if(h<0)h+=1;
+  }
+  const s=max>0?d/max:0;
+  const isRed=(h<0.05||h>0.92),isOrg=(h>=0.05&&h<0.12);
+  const isGreen=(h>=0.25&&h<0.50),isCyan=(h>=0.47&&h<0.57),isBlue=(h>=0.55&&h<0.72);
+  if((isRed||isOrg)&&s<0.55&&max>0.55)return'supply_zone';
+  if((isGreen||isCyan||isBlue)&&s<0.55&&max>0.55)return'demand_zone';
+  if((isRed||isOrg)&&s>=0.40)return'bearish';
+  if((isGreen||isCyan)&&s>=0.35)return'bullish';
+  if(isBlue&&s>=0.40)return'bullish';
+  return'neu';
+}
+
+function fzImgStats(pixels,w,h){
+  let sumR=0,sumG=0,sumB=0,n=0;
+  for(let i=0;i<pixels.length;i+=16){sumR+=pixels[i];sumG+=pixels[i+1];sumB+=pixels[i+2];n++}
+  const mr=sumR/n,mg=sumG/n,mb=sumB/n;
+  const br=(mr+mg+mb)/3;
+  const theme=br<100?'dark':'light';
+  const bias=mg-mr>8?'BULLISH (dominasi hijau)':mr-mg>8?'BEARISH (dominasi merah)':'NETRAL';
+  return{theme,color_bias:bias,brightness:Math.round(br),image_size:`${w}×${h}`};
+}
+
+function fzChartBounds(pixels,w,h){
+  return[Math.round(w*0.08),Math.round(h*0.08),Math.round(w*0.95),Math.round(h*0.92)];
+}
+
+function fzReconstructCandles(pixels,w,h,bounds,nC){
+  const[x1,y1,x2,y2]=bounds;
+  const chartW=x2-x1,chartH=y2-y1;
+  if(chartW<10||chartH<10)return[];
+  const colW=Math.max(1,Math.floor(chartW/nC));
+  const candles=[];
+  for(let i=0;i<nC;i++){
+    const cxs=x1+i*colW,cxe=Math.min(x2,cxs+colW);
+    const rows=[];
+    const step=Math.max(1,Math.floor(chartH/60));
+    for(let y=y1;y<y2;y+=step){
+      const clsCounts={};
+      for(let x=cxs;x<cxe;x++){
+        const idx=(y*w+x)*4;
+        const cls=fzClassify(pixels[idx],pixels[idx+1],pixels[idx+2]);
+        clsCounts[cls]=(clsCounts[cls]||0)+1;
+      }
+      const dom=Object.entries(clsCounts).sort((a,b)=>b[1]-a[1])[0];
+      if(dom)rows.push({y_rel:(y-y1)/chartH,cls:dom[0]});
+    }
+    const bull=rows.filter(r=>r.cls==='bullish');
+    const bear=rows.filter(r=>r.cls==='bearish');
+    const sup=rows.filter(r=>r.cls==='supply_zone');
+    const dem=rows.filter(r=>r.cls==='demand_zone');
+    let type='empty';
+    let activeRows=[];
+    if(bull.length>bear.length&&bull.length>1){type='bullish';activeRows=bull}
+    else if(bear.length>bull.length&&bear.length>1){type='bearish';activeRows=bear}
+    else if(bull.length===0&&bear.length===0)type='empty';
+    else{type='doji';activeRows=[...bull,...bear]}
+
+    let bodyTop=0.5,bodyBot=0.5,bodySize=0;
+    if(activeRows.length){
+      const yrs=activeRows.map(r=>r.y_rel);
+      bodyTop=Math.min(...yrs);bodyBot=Math.max(...yrs);bodySize=bodyBot-bodyTop;
+    }
+    const ch=Math.max(0.01,bodyBot-bodyTop);
+    const nbull=bull.length,nbear=bear.length;
+    const strength=Math.min(1,bodySize/ch);
+    candles.push({type,bodyTop,bodyBot,bodySize,strength,has_supply_zone:sup.length>1,has_demand_zone:dem.length>1,n_bullish:nbull,n_bearish:nbear,col_index:i});
+  }
+  return candles;
+}
+
+function fzDetectZones(candles){
+  const zones=[];const n=candles.length;
+  const impMin=0.04,baseMax=0.025,impStrMin=0.45;
+  for(let i=1;i<n-2;i++){
+    const prev=candles[i-1],base=candles[i],next1=candles[i+1],next2=candles[i+2];
+    if(base.type==='empty')continue;
+    // DEMAND
+    if(next1&&next1.type==='bullish'&&next1.bodySize>=impMin&&next1.strength>=impStrMin){
+      const z={type:'DEMAND',zone_top:base.bodyTop,zone_bot:base.bodyBot,formation_col:i,impulse_col:i+1,impulse_strength:next1.strength,base_size:base.bodySize,base_type:base.type};
+      z.pattern=prev&&prev.type==='bearish'&&prev.bodySize>=impMin?'DROP-BASE-RALLY':'BASE-RALLY';
+      z.pattern_strength=z.pattern==='DROP-BASE-RALLY'?1.0:0.7;
+      z.double_impulse=!!(next2&&next2.type==='bullish');
+      zones.push(z);
+    }
+    // SUPPLY
+    if(next1&&next1.type==='bearish'&&next1.bodySize>=impMin&&next1.strength>=impStrMin){
+      const z={type:'SUPPLY',zone_top:base.bodyTop,zone_bot:base.bodyBot,formation_col:i,impulse_col:i+1,impulse_strength:next1.strength,base_size:base.bodySize,base_type:base.type};
+      z.pattern=prev&&prev.type==='bullish'&&prev.bodySize>=impMin?'RALLY-BASE-DROP':'BASE-DROP';
+      z.pattern_strength=z.pattern==='RALLY-BASE-DROP'?1.0:0.7;
+      z.double_impulse=!!(next2&&next2.type==='bearish');
+      zones.push(z);
+    }
+  }
+  return zones;
+}
+
+function fzVisualZones(candles){
+  const vz=[];
+  if(candles.some(c=>c.has_supply_zone))vz.push({type:'SUPPLY'});
+  if(candles.some(c=>c.has_demand_zone))vz.push({type:'DEMAND'});
+  return vz;
+}
+
+function fzFreshness(zone,candles,visualZones){
+  let score=40;const pos=[],neg=[];
+  const{formation_col:fc,impulse_col:ic,zone_top:zt,zone_bot:zb,type:ztype}=zone;
+  const postImpulse=candles.slice(ic+1);
+  let retest=0,deep=0;
+  postImpulse.forEach(c=>{
+    if(c.bodyTop<zb&&c.bodyBot>zt){retest++;
+      const ov=Math.min(c.bodyBot,zb)-Math.max(c.bodyTop,zt);
+      const zh=Math.max(.001,zb-zt);
+      if(ov/zh>0.5)deep++;
+    }
+  });
+  if(retest===0){score+=35;pos.push('Zona belum pernah di-retest (zero-touch)')}
+  else if(retest===1&&deep===0){score+=10;pos.push('1 retest ringan (wick), zona masih valid');neg.push('1 kali price menyentuh zona')}
+  else{score-=35*Math.min(retest,3);neg.push(`Zona di-retest ${retest}× — kekuatan berkurang`);if(deep>0){score-=15;neg.push(`Price masuk dalam ke zona (${deep}× close di dalam zona)`)}}
+
+  const is=zone.impulse_strength||0.5;
+  if(is>=0.75){score+=20;pos.push(`Impulse sangat kuat (${(is*100).toFixed(0)}%) — institutional order flow`)}
+  else if(is>=0.55){score+=10;pos.push(`Impulse cukup kuat (${(is*100).toFixed(0)}%)`)}
+  else{score-=15;neg.push(`Impulse lemah (${(is*100).toFixed(0)}%) — potensi false zone`)}
+
+  if((zone.pattern_strength||0)>=1){score+=15;pos.push(`Pola SMC ideal: ${zone.pattern}`)}
+  else{score+=5;pos.push(`Pola dasar: ${zone.pattern}`)}
+
+  if(zone.double_impulse){score+=10;pos.push('Double impulse — momentum berlanjut')}
+
+  const bs=zone.base_size||0.02;
+  if(bs<=0.015){score+=10;pos.push('Base sangat kecil — konsolidasi ketat, level presisi')}
+  else if(bs<=0.03){score+=5;pos.push('Base proporsional')}
+  else{score-=10;neg.push('Base terlalu besar — zona kurang presisi')}
+
+  if(visualZones.some(v=>v.type===ztype)){score+=10;pos.push('Platform menandai zona ini secara visual')}
+
+  if(candles.length){
+    const last=candles[candles.length-1];
+    const lm=(last.bodyTop+last.bodyBot)/2,zm=(zt+zb)/2;
+    const dist=Math.abs(lm-zm);
+    if(ztype==='DEMAND'&&lm<zm&&dist>0.35){score-=15;neg.push('Zona terlalu jauh dari harga saat ini')}
+    else if(ztype==='SUPPLY'&&lm>zm&&dist>0.35){score-=15;neg.push('Zona terlalu jauh dari harga saat ini')}
+    else{pos.push('Zona dalam jangkauan harga sekarang')}
+  }
+
+  score=Math.max(0,Math.min(100,score));
+  const clf=score>=75?'FRESH_ZONE':score>=35?'LIQUIDITY_GRAB':'NOT_FRESH';
+  const dq=Math.min(1,candles.length/40);
+  const conf=Math.min(95,Math.round(50+dq*40+(retest===0?10:0)));
+  return{fuzzy_score:score,classification:clf,retest_count:retest,deep_retest:deep,reasons_positive:pos,reasons_negative:neg,confidence:conf,impulse_strength:is,pattern:zone.pattern||'N/A'};
+}
+
+function fzAggregate(zoneResults,visualZones,candles,imgStats){
+  let best=null,score=20,clf='NOT_FRESH',ztStr='UNCLEAR',retest=0;
+  if(zoneResults.length){
+    best=zoneResults.reduce((a,b)=>b.fuzzy_score>a.fuzzy_score?b:a);
+    score=best.fuzzy_score;clf=best.classification;
+    ztStr=best.zone_type;retest=best.retest_count;
+  } else if(visualZones.length){
+    score=35;clf='LIQUIDITY_GRAB';
+    ztStr=visualZones.map(v=>v.type).join('/');
+  }
+
+  const bull=candles.filter(c=>c.type==='bullish').length;
+  const bear=candles.filter(c=>c.type==='bearish').length;
+  const tot=Math.max(1,bull+bear);
+  const bp=bull/tot*100;
+  const cbias=bp>55?'bullish':bp<45?'bearish':'netral';
+
+  const ed=fzEntryDecision(score,retest,ztStr,clf);
+
+  const indPos=(best?.reasons_positive||[]).map(r=>({t:'pos',r:'✓ '+r}));
+  const indNeg=(best?.reasons_negative||[]).map(r=>({t:'neg',r:'✗ '+r}));
+  const indNeu=[
+    {t:'neu',r:`📊 ${bull} bullish, ${bear} bearish dari ${tot} candle`},
+    {t:'neu',r:`🎨 Theme: ${imgStats.theme.toUpperCase()} | Bias: ${imgStats.color_bias}`},
+  ];
+  if(zoneResults.length)indNeu.push({t:'neu',r:`🔍 ${zoneResults.length} zona terdeteksi`});
+
+  return{
+    classification:clf,fuzzy_score:score,confidence:best?.confidence||40,
+    zone_type:ztStr,zones_detected:zoneResults.length,candle_count:tot,
+    bull_pct:Math.round(bp*10)/10,img_stats:imgStats,retest_count:retest,
+    pattern:best?.pattern||'N/A',entry_decision:ed,
+    indicators:[...indPos,...indNeg,...indNeu],
+    summary:fzBuildSummary(clf,score,ztStr,zoneResults.length,cbias,imgStats,best,bp),
+    recommendation:fzBuildRec(clf,ztStr,score),
+  };
+}
+
+function fzBuildSummary(clf,score,zt,nZones,cbias,imgStats,best,bp){
+  const lbls={FRESH_ZONE:'zona fresh tanpa retest',LIQUIDITY_GRAB:'potensi liquidity grab',NOT_FRESH:'zona yang sudah mitigated'};
+  const clfl=lbls[clf]||'zona tidak jelas';
+  const retStr=best&&best.retest_count>0?`Zona telah di-retest ${best.retest_count}×.`:'Zona belum mengalami retest.';
+  const patStr=best?`Pola: ${best.pattern}.`:'';
+  return`Analisis RGB mendeteksi ${nZones>0?nZones+' zona':'zona visual'} pada chart tema ${imgStats.theme}. Fuzzy score ${score}/100 — ${clfl}. ${patStr} ${retStr} Bias candle: ${cbias} (${Math.round(bp)}% bullish).`;
+}
+
+function fzBuildRec(clf,zt,score){
+  if(clf==='FRESH_ZONE'){
+    if(zt==='DEMAND')return'🟢 ZONA DEMAND FRESH — Pertimbangkan area entry BELI. Tunggu harga kembali ke zona dengan konfirmasi PA (pin bar / engulfing bullish). SL di bawah zona, TP ke swing high terdekat, R:R min 1:2.';
+    if(zt==='SUPPLY')return'🔴 ZONA SUPPLY FRESH — Pertimbangkan area entry JUAL. Tunggu konfirmasi (pin bar bearish, engulfing bearish). SL di atas zona, TP ke swing low, R:R min 1:2.';
+    return'🟡 Zona fresh terdeteksi, tipe tidak dapat dikonfirmasi. Analisis manual diperlukan.';
+  }
+  if(clf==='LIQUIDITY_GRAB')return'⚡ LIQUIDITY GRAB — Zona sudah pernah diuji sekali. Masih mungkin valid, namun butuh konfirmasi lebih kuat. Gunakan lot lebih kecil karena risiko lebih tinggi dibanding fresh zone.';
+  return'⛔ ZONA MITIGATED — Zona ini telah diuji beberapa kali. Tidak disarankan entry. Cari zona fresh di timeframe lebih tinggi atau tunggu BOS (Break of Structure) baru.';
+}
+
+function fzEntryDecision(score,retest,zt,clf){
+  if(retest>1){
+    return{decision:'SR_VIOLATED',title:'⛔  JANGAN ENTRY — S/R DILANGGAR > 1×',color:'sr',
+      rule:`Aturan [E]: SR touch ${retest}× > 1 → JANGAN ENTRY`,
+      reason:`Zona S/R telah di-touch/break ${retest}× — melebihi batas. Zona dianggap mitigated.`,
+      steps:['Jangan masuk posisi di zona ini','Cari zona fresh yang belum di-touch >1×','Tunggu BOS (Break of Structure) baru','Pindah ke timeframe lebih tinggi'],
+      entry_type:null,order:null,sl:null,tp:null};
+  }
+  if(score===100){
+    const steps=zt==='DEMAND'?['Pasang LIMIT BUY di batas atas zona demand','SL di bawah batas bawah zona (buffer 5–10 pips)','TP minimal 2× jarak SL ke swing high','Risk 1–2% per trade dari kapital']:
+                               ['Pasang LIMIT SELL di batas bawah zona supply','SL di atas batas atas zona (buffer 5–10 pips)','TP minimal 2× jarak SL ke swing low','Risk 1–2% per trade dari kapital'];
+    return{decision:'LIMIT_ORDER',title:'✦  LIMIT ORDER — ENTRY LANGSUNG',color:'limit',
+      rule:`Aturan [A]+[D]: Score=100 & SR touch=${retest}× ≤1 → LIMIT ORDER`,
+      reason:`Fuzzy score sempurna (100/100). Zona ideal: zero-retest, impulse kuat, pola SMC valid. SR touch: ${retest}× (aman ≤1×).`,
+      steps,entry_type:'LIMIT ORDER',
+      order:zt==='DEMAND'?'LIMIT BUY @ batas atas zona demand':'LIMIT SELL @ batas bawah zona supply',
+      sl:zt==='DEMAND'?'SL di bawah batas bawah zona demand + buffer':'SL di atas batas atas zona supply + buffer',
+      tp:'Target minimal 1:2 R:R ke swing high/low terdekat'};
+  }
+  if(score>=70){
+    const steps=zt==='DEMAND'?['Pantau harga saat mendekati zona demand','Tunggu: pin bar bullish / bullish engulfing / inside bar','Entry setelah candle konfirmasi CLOSE di atas zona','SL di bawah low candle konfirmasi atau bawah zona','TP minimal 2× SL ke swing high','JANGAN entry hanya dari zona tanpa konfirmasi PA']:
+                               ['Pantau harga saat mendekati zona supply','Tunggu: pin bar bearish / engulfing bearish / rejection wick','Entry setelah candle konfirmasi CLOSE di bawah zona','SL di atas high candle konfirmasi atau atas zona','TP minimal 2× SL ke swing low','JANGAN entry hanya dari zona tanpa konfirmasi PA'];
+    return{decision:'WAIT_CONFIRM',title:'⏳  TUNGGU KONFIRMASI — BELUM ENTRY',color:'wait',
+      rule:`Aturan [B]+[D]: Score=${score} (70–99) & SR touch=${retest}× ≤1 → TUNGGU KONFIRMASI`,
+      reason:`Score ${score}/100 valid (70–99) tapi belum sempurna. Entry HANYA setelah konfirmasi PA terbentuk. SR touch: ${retest}× (aman ≤1×).`,
+      steps,entry_type:'CONFIRMATION ENTRY',
+      order:zt==='DEMAND'?'MARKET/LIMIT BUY setelah konfirmasi bullish PA':'MARKET/LIMIT SELL setelah konfirmasi bearish PA',
+      sl:zt==='DEMAND'?'SL di bawah batas bawah zona demand + buffer':'SL di atas batas atas zona supply + buffer',
+      tp:'Target minimal 1:2 R:R ke swing high/low terdekat'};
+  }
+  return{decision:'NO_ENTRY',title:'✕  JANGAN ENTRY — SCORE TIDAK MEMADAI',color:'no',
+    rule:`Aturan [C]: Score=${score} < 70 → JANGAN ENTRY`,
+    reason:`Score ${score}/100 di bawah minimum 70. Zona tidak memiliki kualitas cukup. Risiko terlalu tinggi.`,
+    steps:['Jangan masuk posisi di zona ini',`Tunggu zona dengan score ≥70 atau score sempurna 100`,'Cari zona fresh di timeframe sama atau lebih tinggi','Analisis ulang setelah terbentuk pola candle baru'],
+    entry_type:null,order:null,sl:null,tp:null};
+}
+
+/* ── Render Results ── */
+function fzScoreColor(score){
+  if(score>=75)return'var(--limit-col)';
+  if(score>=35)return'var(--wait-col)';
+  return'var(--no-col)';
+}
+function fzPanelCls(clf){
+  return{FRESH_ZONE:'fresh',LIQUIDITY_GRAB:'grab',NOT_FRESH:'spent'}[clf]||'spent';
+}
+
+function fzRenderResult(r){
+  const cont=document.getElementById('fzResults');
+  const score=r.fuzzy_score,clf=r.classification,ed=r.entry_decision;
+  const scoreColor=fzScoreColor(score);
+  const panelCls=fzPanelCls(clf);
+
+  // Gauge SVG
+  const gaugeArc=(pct,color)=>{
+    const R=54,cx=64,cy=64,start=-Math.PI,end=-Math.PI+Math.PI*pct;
+    const x1=cx+R*Math.cos(start),y1=cy+R*Math.sin(start);
+    const x2=cx+R*Math.cos(end),y2=cy+R*Math.sin(end);
+    const large=pct>0.5?1:0;
+    return`<path d="M${x1},${y1} A${R},${R} 0 ${large},1 ${x2},${y2}" fill="none" stroke="${color}" stroke-width="10" stroke-linecap="round"/>`;
+  };
+  const gaugeSVG=`
+    <svg width="128" height="72" viewBox="0 0 128 72">
+      ${gaugeArc(1,'var(--border)')}
+      ${score>0?gaugeArc(score/100,scoreColor):''}
+    </svg>`;
+
+  const clfLabel={FRESH_ZONE:'✦ ZONA FRESH',LIQUIDITY_GRAB:'⚡ LIQUIDITY GRAB',NOT_FRESH:'✕ BUKAN FRESH'}[clf]||clf;
+
+  // Entry decision color map
+  const edColors={limit:['var(--limit-col)','var(--limit-bg)'],wait:['var(--wait-col)','var(--wait-bg)'],no:['var(--no-col)','var(--no-bg)'],sr:['var(--sr-col)','var(--sr-bg)']};
+  const[edCol,edBg]=edColors[ed.color]||['var(--dim)','var(--card)'];
+
+  const stepsHTML=(ed.steps||[]).map((s,i)=>`
+    <li style="display:flex;gap:8px;font-size:10px;color:var(--text);align-items:flex-start;margin-bottom:4px">
+      <span style="background:${edCol};color:var(--bg);width:18px;height:18px;border-radius:4px;font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">${i+1}</span>
+      <span>${s}</span>
+    </li>`).join('');
+
+  const techRows=[
+    ['FUZZY SCORE',`${ed.fuzzy_score??score}/100`,edCol],
+    ['SR TOUCH',`${ed.sr_touch??r.retest_count}× (maks 1×)`,edCol],
+    ['ZONE TYPE',ed.zone_type??r.zone_type,edCol],
+    ['ENTRY TYPE',ed.entry_type||'TIDAK ENTRY',edCol],
+  ];
+  if(ed.order)techRows.push(['ORDER',ed.order,edCol]);
+  if(ed.sl)techRows.push(['STOP LOSS',ed.sl,edCol]);
+  if(ed.tp)techRows.push(['TAKE PROFIT',ed.tp,edCol]);
+
+  const techHTML=techRows.map(([k,v,c])=>`
+    <div class="tech-row">
+      <span class="tech-lbl">${k}</span>
+      <span class="tech-val" style="color:${c}">${v}</span>
+    </div>`).join('');
+
+  const indicatorsHTML=(r.indicators||[]).map(ind=>`
+    <div class="indicator-row ${ind.t}"><span>${ind.r}</span></div>`).join('');
+
+  const statChips=[
+    ['Ukuran',r.img_stats.image_size],['Tema',r.img_stats.theme.toUpperCase()],
+    ['Bias',r.img_stats.color_bias],['Candle',r.candle_count],
+    ['Bull%',r.bull_pct+'%'],['Zona',r.zones_detected],
+  ];
+  const chipsHTML=statChips.map(([l,v])=>`
+    <div class="stat-chip"><div class="chip-lbl">${l}</div><div class="chip-val">${v}</div></div>`).join('');
+
+  cont.innerHTML=`
+    <!-- Score + Badge -->
+    <div class="result-panel ${panelCls}">
+      <div class="rp-title" style="color:${scoreColor}">HASIL ANALISIS RGB ENGINE</div>
+      <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
+        <div class="gauge-wrap">
+          ${gaugeSVG}
+          <div class="gauge-val" style="color:${scoreColor}">${score}</div>
+          <div class="gauge-lbl">FUZZY SCORE / 100</div>
+        </div>
+        <div style="flex:1;min-width:180px">
+          <div style="background:${scoreColor};color:var(--bg);padding:8px 14px;border-radius:8px;font-size:13px;font-weight:800;margin-bottom:12px;font-family:'Syne',sans-serif">${clfLabel}</div>
+          <div class="meta-grid">
+            <div class="meta-item"><div class="meta-k">ZONE TYPE</div><div class="meta-v">${r.zone_type}</div></div>
+            <div class="meta-item"><div class="meta-k">CONFIDENCE</div><div class="meta-v">${r.confidence}%</div></div>
+            <div class="meta-item"><div class="meta-k">RETESTS</div><div class="meta-v">${r.retest_count}×</div></div>
+            <div class="meta-item"><div class="meta-k">PATTERN</div><div class="meta-v" style="font-size:9px">${r.pattern}</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Entry Decision -->
+    <div class="ed-panel ${ed.color}">
+      <div style="font-size:9px;color:var(--dim);letter-spacing:1px;margin-bottom:6px">KEPUTUSAN ENTRY</div>
+      <div style="font-size:9px;color:var(--muted,#5a7080);margin-bottom:10px">${ed.rule||''}</div>
+      <div class="ed-badge ${ed.color}">${ed.title}</div>
+
+      <div style="background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:10px">
+        <div style="font-size:8px;color:var(--dim);letter-spacing:1px;margin-bottom:8px">DETAIL TEKNIS</div>
+        ${techHTML}
+      </div>
+
+      <div style="background:rgba(0,0,0,.2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:10px">
+        <div style="font-size:8px;color:var(--dim);letter-spacing:1px;margin-bottom:6px">ALASAN</div>
+        <div style="font-size:10px;color:var(--text);line-height:1.7">${ed.reason||''}</div>
+      </div>
+
+      ${stepsHTML?`
+      <div style="font-size:8px;color:var(--dim);letter-spacing:1px;margin-bottom:8px">LANGKAH TINDAKAN</div>
+      <ul class="steps-list">${stepsHTML}</ul>`:''}
+    </div>
+
+    <!-- Statistik Gambar -->
+    <div class="result-panel">
+      <div class="rp-title" style="color:var(--blue)">STATISTIK GAMBAR (RGB)</div>
+      <div class="stat-chips">${chipsHTML}</div>
+    </div>
+
+    <!-- Indikator -->
+    ${indicatorsHTML?`
+    <div class="result-panel">
+      <div class="rp-title" style="color:var(--purple)">INDIKATOR & TEMUAN</div>
+      ${indicatorsHTML}
+    </div>`:''}
+
+    <!-- Summary -->
+    <div class="result-panel">
+      <div class="rp-title" style="color:var(--accent)">ANALISIS</div>
+      <div class="scroll-text">${r.summary||''}</div>
+    </div>
+
+    <!-- Recommendation -->
+    <div class="result-panel ${panelCls}">
+      <div class="rp-title" style="color:${scoreColor}">REKOMENDASI TRADING</div>
+      <div class="scroll-text" style="max-height:120px">${r.recommendation||''}</div>
+    </div>
+
+    <div class="disclaimer">
+      ⚠ Analisis ini bersifat edukatif. Bukan saran investasi. Selalu gunakan manajemen risiko yang baik.
+    </div>
+  `;
+
+  showToast(`✔ Analisis selesai — Score: ${score}/100 | ${ed.decision}`);
+}
+</script>
+</body>
+</html>
